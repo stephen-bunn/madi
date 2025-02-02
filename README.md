@@ -8,6 +8,7 @@ Policies are defined in JSON following the following format.
 ```json
 // test-policy.policy.json
 {
+  "$schema": "https://raw.githubusercontent.com/stephen-bunn/madi/refs/heads/main/schemas/v1/MadiPolicy.json"
   "ref": "PolicyReference",
   "rules": [
     {
@@ -44,6 +45,7 @@ Policies can exit immediately if any `ALLOW` rule is matched.
 ```json
 // test-policy.policy.json
 {
+  "$schema": "https://raw.githubusercontent.com/stephen-bunn/madi/refs/heads/main/schemas/v1/MadiPolicy.json",
   "ref": "PolicyReference",
   "rules": [
     {
@@ -85,5 +87,5 @@ from madi import validate_policy_dir
 
 # By default, any files matching the pattern `*.policy.json` will be loaded.
 # You can customize this suffix by passing in the `suffix` parameter.
-validate_policy_dir("path/to/policies", {"test": "selection"})
+validate_policy_dir("path/to/policies", {"test": "selection"}, suffix=".json")
 ```
