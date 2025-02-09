@@ -5,10 +5,15 @@
   "definitions": {
     "rule": {
       "type": "object",
-      "required": ["ref", "action", "select", "schema"],
+      "required": ["ref", "uid", "action", "select", "schema"],
       "properties": {
         "ref": {
           "description": "A identifying reference to this rule; preferably a unique identifier.",
+          "type": "string",
+          "minLength": 1
+        },
+        "uid": {
+          "description": "A unique identifier for the rule; preferably a UUID.",
           "type": "string",
           "minLength": 1
         },
@@ -38,7 +43,7 @@
     }
   },
   "type": "object",
-  "required": ["ref", "rules"],
+  "required": ["ref", "uid", "rules"],
   "properties": {
     "v": {
       "description": "The version identifier of the policy schema.",
@@ -47,6 +52,11 @@
     },
     "ref": {
       "description": "A identifying reference to this policy; preferably a unique identifier.",
+      "type": "string",
+      "minLength": 1
+    },
+    "uid": {
+      "description": "A unique identifier for the policy; preferably a UUID.",
       "type": "string",
       "minLength": 1
     },

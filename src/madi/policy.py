@@ -7,6 +7,7 @@ import jsonschema
 from jmespath.exceptions import EmptyExpressionError, ParseError
 from msgspec import json
 
+from madi.cache import PolicyCache
 from madi.constants import DEFAULT_POLICY_META_SCHEMA, POLICY_META_SCHEMAS, POLICY_SUFFIX
 from madi.errors import AllowedPolicy, DeniedPolicy, InvalidPolicy
 from madi.types import Policy, PolicyRule
@@ -53,7 +54,12 @@ def is_valid_policy(policy: dict | Policy) -> TypeGuard[Policy]:
         raise InvalidPolicy("Policy validation failed", policy) from err
 
 
-def validate_policy_rule(policy: Policy, rule: PolicyRule, payload: dict):
+def validate_policy_rule(
+    policy: Policy,
+    rule: PolicyRule,
+    payload: dict,
+    cache: PolicyCache | None = None,
+):
     """Validate a policy rule against a payload.
 
     This function validates a policy rule against a given payload. It uses JMESPath to query
@@ -66,9 +72,10 @@ def validate_policy_rule(policy: Policy, rule: PolicyRule, payload: dict):
     selection = jmespath.search(select, payload)
     if selection is None:
         if strict:
-            raise DeniedPolicy.from_policy(
-                policy, rule, f"Rule select returned nothing, {select!r}"
-            )
+            message = f"Rule select returned nothing, {select!r}"
+            if cache is not None:
+                cache.add(policy, payload, rule, "DENY", message)
+            raise DeniedPolicy.from_policy(policy, rule, message)
 
         return
 
@@ -76,16 +83,28 @@ def validate_policy_rule(policy: Policy, rule: PolicyRule, payload: dict):
         jsonschema.validate(selection, rule["schema"])
     except jsonschema.ValidationError as err:
         if strict:
+            if cache is not None:
+                cache.add(policy, payload, rule, "DENY")
             raise DeniedPolicy.from_policy(policy, rule) from err
 
         return
 
-    raise (DeniedPolicy if rule["action"] == "DENY" else AllowedPolicy).from_query(
-        policy, rule, select, selection
-    )
+    try:
+        raise (DeniedPolicy if rule["action"] == "DENY" else AllowedPolicy).from_query(
+            policy, rule, select, selection
+        )
+    except (DeniedPolicy, AllowedPolicy):
+        if cache is not None:
+            cache.add(policy, payload, rule, rule["action"], select, selection)
+        raise
 
 
-def validate_policy(policy: Policy, payload: dict, raise_allowed: bool = False):
+def validate_policy(
+    policy: Policy,
+    payload: dict,
+    raise_allowed: bool = False,
+    cache: PolicyCache | None = None,
+):
     """Validate each rule in a policy against a payload.
 
     This will raise a `DeniedPolicy` exception on the first rule that fails. If no rule fails,
@@ -93,9 +112,38 @@ def validate_policy(policy: Policy, payload: dict, raise_allowed: bool = False):
     it will return `None`.
     """
 
+    if cache is not None:
+        cache_result = cache.get(policy, payload)
+        if cache_result is not None:
+            if cache_result["action"] == "DENY":
+                if "select" in cache_result and "selection" in cache_result:
+                    raise DeniedPolicy.from_query(
+                        policy,
+                        cache_result["rule"],
+                        cache_result["select"],
+                        cache_result["selection"],
+                    )
+                raise DeniedPolicy.from_policy(
+                    policy, cache_result["rule"], cache_result.get("message")
+                )
+            elif cache_result["action"] == "ALLOW":
+                if raise_allowed:
+                    if "select" in cache_result and "selection" in cache_result:
+                        raise AllowedPolicy.from_query(
+                            policy,
+                            cache_result["rule"],
+                            cache_result["select"],
+                            cache_result["selection"],
+                        )
+
+                    raise AllowedPolicy.from_policy(
+                        policy, cache_result["rule"], cache_result.get("message")
+                    )
+                return
+
     for rule in policy["rules"]:
         try:
-            validate_policy_rule(policy, rule, payload)
+            validate_policy_rule(policy, rule, payload, cache=cache)
         except AllowedPolicy as err:
             if raise_allowed:
                 raise err
