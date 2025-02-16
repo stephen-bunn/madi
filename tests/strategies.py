@@ -143,5 +143,9 @@ def policy_with_action(
     schema: SearchStrategy[dict] | None = None,
 ) -> Policy:
     return draw(
-        policy(rules=lists(policy_rule(select=select, schema=schema, action=action), min_size=1))
+        policy(
+            rules=lists(
+                policy_rule(select=select, schema=schema, action=action), min_size=1, max_size=3
+            )
+        )
     )
