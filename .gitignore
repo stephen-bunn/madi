@@ -180,3 +180,4 @@ main.py
 
 # Files using default policy suffix
 *.policy.json
+*.cache.json

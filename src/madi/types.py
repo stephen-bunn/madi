@@ -1,5 +1,8 @@
 from typing import Literal, NotRequired, TypedDict
 
+type PolicyAction = Literal["ALLOW", "DENY"]
+"""A type alias for policy actions."""
+
 
 class PolicyRule(TypedDict):
     """Defines a policy rule."""
@@ -7,13 +10,16 @@ class PolicyRule(TypedDict):
     ref: str
     """A reference identifier for the rule."""
 
+    uid: str
+    """A unique identifier for the rule."""
+
     strict: NotRequired[bool]
     """If true, the rule is strict and must be enforced."""
 
     description: NotRequired[str]
     """An optional description of the rule."""
 
-    action: Literal["ALLOW", "DENY"]
+    action: PolicyAction
     """The decision to make when the rule is evaluated."""
 
     select: str
@@ -28,6 +34,9 @@ class Policy(TypedDict):
 
     ref: str
     """A reference identifier for the policy."""
+
+    uid: str
+    """A unique identifier for the policy."""
 
     strict: NotRequired[bool]
     """

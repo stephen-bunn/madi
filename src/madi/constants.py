@@ -8,10 +8,15 @@ POLICY_META_SCHEMA_V1 = {
     "definitions": {
         "rule": {
             "type": "object",
-            "required": ["ref", "action", "select", "schema"],
+            "required": ["ref", "uid", "action", "select", "schema"],
             "properties": {
                 "ref": {
                     "description": "A identifying reference to this rule; preferably a unique identifier.",
+                    "type": "string",
+                    "minLength": 1,
+                },
+                "uid": {
+                    "description": "A unique identifier for this rule; preferably a UUID.",
                     "type": "string",
                     "minLength": 1,
                 },
@@ -41,7 +46,7 @@ POLICY_META_SCHEMA_V1 = {
         }
     },
     "type": "object",
-    "required": ["ref", "rules"],
+    "required": ["ref", "uid", "rules"],
     "properties": {
         "v": {
             "description": "The version identifier of the policy schema.",
@@ -50,6 +55,11 @@ POLICY_META_SCHEMA_V1 = {
         },
         "ref": {
             "description": "A identifying reference to this policy; preferably a unique identifier.",
+            "type": "string",
+            "minLength": 1,
+        },
+        "uid": {
+            "description": "A unique identifier for this policy; preferably a UUID.",
             "type": "string",
             "minLength": 1,
         },

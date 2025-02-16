@@ -1,10 +1,11 @@
 import string
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from unittest import mock
 
 import pytest
 from hypothesis import assume, given
-from hypothesis.strategies import just, lists, none, nothing, sampled_from, text
+from hypothesis.strategies import dictionaries, just, lists, none, nothing, sampled_from, text
 from msgspec import json
 
 from madi.constants import DEFAULT_POLICY_META_SCHEMA, POLICY_META_SCHEMAS, POLICY_SUFFIX
@@ -19,7 +20,7 @@ from madi.policy import (
 )
 from madi.types import Policy
 from tests.helpers import temp_dirpath
-from tests.strategies import missing_path, policy, policy_rule, policy_with_action
+from tests.strategies import base_type, missing_path, policy, policy_rule, policy_with_action
 
 
 def describe_get_policy_meta_schema():
@@ -93,12 +94,16 @@ def describe_is_valid_policy():
 def describe_validate_policy_rule():
     @given(policy(rules=lists(policy_rule(strict=just(False)), min_size=1, max_size=1)))
     def it_does_not_raise_by_default_if_selection_is_none(policy: Policy):
-        assert validate_policy_rule(policy, policy["rules"][0], {}) is None
+        cache = mock.MagicMock()
+        assert validate_policy_rule(policy, policy["rules"][0], {}, cache=cache) is None
+        cache.add.assert_not_called()
 
     @given(policy(rules=lists(policy_rule(strict=just(True)), min_size=1, max_size=1)))
     def it_raises_DeniedPolicy_if_rule_is_strict_and_selection_is_none(policy: Policy):
+        cache = mock.MagicMock()
         with pytest.raises(DeniedPolicy):
-            validate_policy_rule(policy, policy["rules"][0], {})
+            validate_policy_rule(policy, policy["rules"][0], {}, cache=cache)
+            cache.add.assert_called_once_with(policy, {}, policy["rules"][0], "DENY")
 
     @given(
         policy(
@@ -112,7 +117,12 @@ def describe_validate_policy_rule():
         )
     )
     def it_does_not_raise_if_selection_does_not_match_schema(policy: Policy):
-        assert validate_policy_rule(policy, policy["rules"][0], {"test": "selection"}) is None
+        cache = mock.MagicMock()
+        assert (
+            validate_policy_rule(policy, policy["rules"][0], {"test": "selection"}, cache=cache)
+            is None
+        )
+        cache.add.assert_not_called()
 
     @given(
         policy(
@@ -128,8 +138,12 @@ def describe_validate_policy_rule():
     def it_raises_DeniedPolicy_if_rule_is_strict_and_selection_does_not_match_schema(
         policy: Policy,
     ):
+        cache = mock.MagicMock()
         with pytest.raises(DeniedPolicy):
-            validate_policy_rule(policy, policy["rules"][0], {"test": "selection"})
+            validate_policy_rule(policy, policy["rules"][0], {"test": "selection"}, cache=cache)
+            cache.add.assert_called_once_with(
+                policy, {"test": "selection"}, policy["rules"][0], "DENY"
+            )
 
     @given(
         policy(
@@ -146,8 +160,12 @@ def describe_validate_policy_rule():
         )
     )
     def it_raises_DeniedPolicy_if_selection_matches_schema_and_action_is_DENY(policy: Policy):
+        cache = mock.MagicMock()
         with pytest.raises(DeniedPolicy):
-            validate_policy_rule(policy, policy["rules"][0], {"test": "selection"})
+            validate_policy_rule(policy, policy["rules"][0], {"test": "selection"}, cache=cache)
+            cache.add.assert_called_once_with(
+                policy, {"test": "selection"}, policy["rules"][0], "DENY"
+            )
 
     @given(
         policy(
@@ -164,8 +182,12 @@ def describe_validate_policy_rule():
         )
     )
     def it_raises_AllowedPolicy_if_selection_matches_schema_and_action_is_ALLOW(policy: Policy):
+        cache = mock.MagicMock()
         with pytest.raises(AllowedPolicy):
-            validate_policy_rule(policy, policy["rules"][0], {"test": "selection"})
+            validate_policy_rule(policy, policy["rules"][0], {"test": "selection"}, cache=cache)
+            cache.add.assert_called_once_with(
+                policy, {"test": "selection"}, policy["rules"][0], "ALLOW"
+            )
 
 
 def describe_validate_policy():
@@ -202,6 +224,60 @@ def describe_validate_policy():
     ):
         with pytest.raises(AllowedPolicy):
             validate_policy(policy, {"test": "selection"}, raise_allowed=True)
+
+    @given(policy())
+    def it_raises_DeniedPolicy_from_cache(policy: Policy):
+        cache = mock.MagicMock()
+        cache.get.return_value = {"action": "DENY", "rule": policy["rules"][0]}
+        with pytest.raises(DeniedPolicy):
+            validate_policy(policy, {}, cache=cache)
+
+    @given(policy(), text(string.printable), dictionaries(text(string.printable), base_type()))
+    def it_raises_DeniedPolicy_from_cache_with_select_and_selection(
+        policy: Policy, select: str, selection: dict
+    ):
+        cache = mock.MagicMock()
+        cache.get.return_value = {
+            "action": "DENY",
+            "rule": policy["rules"][0],
+            "select": select,
+            "selection": selection,
+        }
+        with pytest.raises(DeniedPolicy) as deny_error:
+            validate_policy(policy, {}, cache=cache)
+            assert deny_error.value == DeniedPolicy.from_query(
+                policy, policy["rules"][0], select, selection
+            )
+
+    @given(policy())
+    def it_does_not_raise_AllowedPolicy_from_cache_by_default(policy: Policy):
+        cache = mock.MagicMock()
+        cache.get.return_value = {"action": "ALLOW", "rule": policy["rules"][0]}
+        assert validate_policy(policy, {}, cache=cache) is None
+
+    @given(policy())
+    def it_raises_AllowedPolicy_from_cache(policy: Policy):
+        cache = mock.MagicMock()
+        cache.get.return_value = {"action": "ALLOW", "rule": policy["rules"][0]}
+        with pytest.raises(AllowedPolicy):
+            validate_policy(policy, {}, raise_allowed=True, cache=cache)
+
+    @given(policy(), text(string.printable), dictionaries(text(string.printable), base_type()))
+    def it_raises_AllowedPolicy_from_cache_with_select_and_selection(
+        policy: Policy, select: str, selection: dict
+    ):
+        cache = mock.MagicMock()
+        cache.get.return_value = {
+            "action": "ALLOW",
+            "rule": policy["rules"][0],
+            "select": select,
+            "selection": selection,
+        }
+        with pytest.raises(AllowedPolicy) as allow_error:
+            validate_policy(policy, {}, raise_allowed=True, cache=cache)
+            assert allow_error.value == AllowedPolicy.from_query(
+                policy, policy["rules"][0], select, selection
+            )
 
 
 def describe_validate_policy_file():
