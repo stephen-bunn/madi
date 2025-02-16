@@ -24,7 +24,7 @@ The fingerprint policy determines how much information is included in the finger
 FINGERPRINT_POLICIES: set[FingerprintPolicy] = {"fast", "full"}
 """The set of all available fingerprint policies."""
 
-DEFAULT_FINGERPRINT_POLICY: FingerprintPolicy = "fast"
+DEFAULT_FINGERPRINT_POLICY: FingerprintPolicy = "full"
 """The default fingerprint policy."""
 
 

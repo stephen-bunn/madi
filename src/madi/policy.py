@@ -149,7 +149,12 @@ def validate_policy(
                 raise err
 
 
-def validate_policy_file(filepath: PathLike[str], payload: dict, raise_allowed: bool = False):
+def validate_policy_file(
+    filepath: PathLike[str],
+    payload: dict,
+    raise_allowed: bool = False,
+    cache: PolicyCache | None = None,
+):
     """Validate a policy file against a payload.
 
     This function reads a policy file from the given path and validates it against the provided
@@ -162,7 +167,7 @@ def validate_policy_file(filepath: PathLike[str], payload: dict, raise_allowed: 
 
     policy = json.decode(filepath.read_bytes())
     if is_valid_policy(policy):
-        validate_policy(policy, payload, raise_allowed=raise_allowed)
+        validate_policy(policy, payload, raise_allowed=raise_allowed, cache=cache)
 
 
 def validate_policy_dir(
@@ -171,6 +176,7 @@ def validate_policy_dir(
     deep: bool = False,
     suffix: str = POLICY_SUFFIX,
     raise_allowed: bool = False,
+    cache: PolicyCache | None = None,
 ):
     """Validate all policy files in a directory against a payload.
 
@@ -186,4 +192,4 @@ def validate_policy_dir(
         if not policy_path.is_file():
             continue
 
-        validate_policy_file(policy_path, payload, raise_allowed=raise_allowed)
+        validate_policy_file(policy_path, payload, raise_allowed=raise_allowed, cache=cache)
