@@ -3,12 +3,8 @@ name = "madi"
 version = "0.1.0"
 description = "Dead simple JSON policy engine."
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "jmespath>=1.0.1",
-    "jsonschema>=4.23.0",
-    "msgspec>=0.18.6",
-]
+requires-python = ">=3.12,<3.13"
+dependencies = ["jmespath>=1.0.1", "jsonschema>=4.23.0", "msgspec>=0.18.6"]
 
 [tool.uv]
 dev-dependencies = [
